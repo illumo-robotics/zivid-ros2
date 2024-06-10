@@ -40,12 +40,12 @@ class Settings;
 
 namespace zivid_camera
 {
-enum class CameraStatus
-{
-  Idle,
-  Connected,
-  Disconnected
-};
+// enum class CameraStatus
+// {
+//   Idle,
+//   Connected,
+//   Disconnected
+// };
 
 class ZividCamera : public rclcpp::Node
 {
@@ -73,8 +73,9 @@ private:
                          const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info,
                          const Zivid::PointCloud& point_cloud);
 
-  CameraStatus camera_status_;
+  // CameraStatus camera_status_;
 
+  rclcpp::Service<zivid_interfaces::srv::IsConnected>::SharedPtr is_connected_service_;
   rclcpp::Service<zivid_interfaces::srv::CameraInfoSerialNumber>::SharedPtr camera_info_serial_number_service_;
   rclcpp::Service<zivid_interfaces::srv::CameraInfoModelName>::SharedPtr camera_info_model_name_service_;
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr capture_service_;
@@ -87,6 +88,10 @@ private:
                                     const std::shared_ptr<zivid_interfaces::srv::CameraInfoModelName::Request> request,
                                     std::shared_ptr<zivid_interfaces::srv::CameraInfoModelName::Response> response);
 
+  void isConnectedServiceHandler(const std::shared_ptr<rmw_request_id_t> request_header,
+      const std::shared_ptr<zivid_interfaces::srv::IsConnected::Request> request,
+      std::shared_ptr<zivid_interfaces::srv::IsConnected::Response> response);
+      
   void cameraInfoSerialNumberServiceHandler(
       const std::shared_ptr<rmw_request_id_t> request_header,
       const std::shared_ptr<zivid_interfaces::srv::CameraInfoSerialNumber::Request> request,
@@ -112,7 +117,8 @@ private:
 
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr points_xyz_publisher_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr points_xyzrgba_publisher_;
-  image_transport::CameraPublisher color_image_publisher_;
+  image_transport::CameraPublisher hd_color_image_publisher_;
+  image_transport::CameraPublisher sd_color_image_publisher_;
   image_transport::CameraPublisher depth_image_publisher_;
   image_transport::CameraPublisher snr_image_publisher_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr normals_xyz_publisher_;

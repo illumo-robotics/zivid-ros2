@@ -83,19 +83,19 @@ sensor_msgs::msg::Image::SharedPtr makePointCloudImage(const Zivid::PointCloud& 
   return image;
 }
 
-std::string toString(zivid_camera::CameraStatus camera_status)
-{
-  switch (camera_status)
-  {
-    case zivid_camera::CameraStatus::Connected:
-      return "Connected";
-    case zivid_camera::CameraStatus::Disconnected:
-      return "Disconnected";
-    case zivid_camera::CameraStatus::Idle:
-      return "Idle";
-  }
-  return "N/A";
-}
+// std::string toString(zivid_camera::CameraStatus camera_status)
+// {
+//   switch (camera_status)
+//   {
+//     case zivid_camera::CameraStatus::Connected:
+//       return "Connected";
+//     case zivid_camera::CameraStatus::Disconnected:
+//       return "Disconnected";
+//     case zivid_camera::CameraStatus::Idle:
+//       return "Idle";
+//   }
+//   return "N/A";
+// }
 
 static bool endsWith(const std::string& str, const std::string& suffix)
 {
@@ -267,6 +267,9 @@ ZividCamera::ZividCamera(const rclcpp::NodeOptions& options) : rclcpp::Node("ziv
   camera_info_model_name_service_ = this->create_service<zivid_interfaces::srv::CameraInfoModelName>(
       "camera_info/model_name", std::bind(&ZividCamera::cameraInfoModelNameServiceHandler, this, _1, _2, _3));
 
+  is_connected_service_ = this->create_service<zivid_interfaces::srv::IsConnected>(
+      "camera_info/is_connected", std::bind(&ZividCamera::isConnectedServiceHandler, this, _1, _2, _3));
+
   capture_service_ = create_service<std_srvs::srv::Empty>(
       "capture", std::bind(&ZividCamera::captureServiceHandler, this, _1, _2, _3));
 
@@ -296,7 +299,8 @@ ZividCamera::ZividCamera(const rclcpp::NodeOptions& options) : rclcpp::Node("ziv
   }
   RCLCPP_INFO_STREAM(this->get_logger(), "Connected to camera '" << camera_.info().serialNumber() << "'");
 
-  color_image_publisher_ = image_transport::create_camera_publisher(this, "color/image_color");
+  hd_color_image_publisher_ = image_transport::create_camera_publisher(this, "color_hd/image");
+  sd_color_image_publisher_ = image_transport::create_camera_publisher(this, "color_sd/image");
   depth_image_publisher_ = image_transport::create_camera_publisher(this, "depth/image");
   snr_image_publisher_ = image_transport::create_camera_publisher(this, "snr/image");
 
@@ -398,7 +402,7 @@ void ZividCamera::publishColorImage(const std_msgs::msg::Header& header,
                                     const Zivid::PointCloud& point_cloud)
 {
   auto image = makePointCloudImage<Zivid::ColorRGBA>(point_cloud, header, sensor_msgs::image_encodings::RGBA8);
-  color_image_publisher_.publish(image, camera_info);
+  sd_color_image_publisher_.publish(image, camera_info);
 }
 
 void ZividCamera::publishSnrImage(const std_msgs::msg::Header& header,
@@ -438,6 +442,25 @@ void ZividCamera::cameraInfoModelNameServiceHandler(
   response->model_name = camera_.info().modelName().toString();
 }
 
+void ZividCamera::isConnectedServiceHandler(const std::shared_ptr<rmw_request_id_t> request_header,
+      const std::shared_ptr<zivid_interfaces::srv::IsConnected::Request> request,
+      std::shared_ptr<zivid_interfaces::srv::IsConnected::Response> response){
+  (void)request_header;
+  (void)request;
+  
+  RCLCPP_DEBUG_STREAM(this->get_logger(), "Camera State: " << camera_.state());
+  if(camera_.state().status() == Zivid::CameraState::Status::connected){
+    response->is_connected = true;
+  } else {
+    response->is_connected = false;
+    response->err_msg = "Camera state = " + camera_.state().toString();
+    if(camera_.state().isAvailable()){
+      RCLCPP_WARN_STREAM(this->get_logger(), "Reconnecting to camera '" << camera_.info().serialNumber() << "'");
+      camera_.connect();
+    }
+  }
+}
+
 void ZividCamera::cameraInfoSerialNumberServiceHandler(
     const std::shared_ptr<rmw_request_id_t> request_header,
     const std::shared_ptr<zivid_interfaces::srv::CameraInfoSerialNumber::Request> request,
@@ -472,7 +495,7 @@ void ZividCamera::capture2DServiceHandler(const std::shared_ptr<rmw_request_id_t
   auto image = frame.imageRGBA();
   const auto camera_info =
       makeCameraInfo(header, image.width(), image.height(), Zivid::Experimental::Calibration::intrinsics(camera_));
-  color_image_publisher_.publish(makeColorImage(header, image), camera_info);
+  hd_color_image_publisher_.publish(makeColorImage(header, image), camera_info);
 }
 
 void ZividCamera::loadSettingsFromFileServiceHandler(
