@@ -494,7 +494,7 @@ void ZividCamera::capture2DServiceHandler(const std::shared_ptr<rmw_request_id_t
   const auto header = makeHeader();
   auto image = frame.imageRGBA();
   const auto camera_info =
-      makeCameraInfo(header, image.width(), image.height(), Zivid::Experimental::Calibration::intrinsics(camera_));
+      makeCameraInfo(header, image.width(), image.height(), Zivid::Experimental::Calibration::intrinsics(camera_, settings2d_));
   hd_color_image_publisher_.publish(makeColorImage(header, image), camera_info);
 }
 
